@@ -220,7 +220,7 @@ def print_run(result: Dict[str, object], run_number: int, total_runs: int) -> No
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Governance Voting Cascade Simulator v0.1")
+    parser = argparse.ArgumentParser(description="Governance Voting Cascade Simulator v0.2")
     parser.add_argument("--agents", type=int, default=50, help="Number of agents to simulate (default: 50)")
     parser.add_argument(
         "--conformity-threshold",

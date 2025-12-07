@@ -2,12 +2,14 @@
 
 Governance Cascade Simulator is a hybrid project: part practical engineering lab for cloud/DevOps/ML-infra/Kubernetes skills, part exploratory research tool for studying governance behavior, whale influence, and cascade effects in decentralized systems. The goal is to showcase infrastructure discipline while enabling agent-based economic modeling.
 
-## What It Does Today (v0.1)
+## What It Does Today (v0.2)
 - Proposal and Agent dataclasses with risk/yield/complexity modeling
 - Conformity-aware decision rule with whale-majority signaling
 - Two-round cascade (initial vote, influence phase)
 - Weighted voting results and tracking of vote flips
-- JSONL logging for downstream analysis
+- Per-agent records exported for downstream analysis (agent attributes + votes)
+- JSONL logging with append mode for incremental runs
+- Detailed agent-level data capture for statistical analysis
 
 ## Running the Simulator
 Examples:
