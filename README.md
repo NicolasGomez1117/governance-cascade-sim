@@ -10,11 +10,12 @@ Governance Cascade Simulator is a hybrid project: part practical engineering lab
 - Per-agent records exported for downstream analysis (agent attributes + votes)
 - JSONL logging with append mode for incremental runs
 - Detailed agent-level data capture for statistical analysis
+- Versioned outputs (`schema_version: "0.2"`) with run metadata (`run_id`, ISO timestamp, seed, params)
 
 ## Running the Simulator
 Examples:
-- `python simulator.py --agents 100 --runs 20 --seed 42`
-- `python simulator.py --agents 50 --conformity-threshold 0.7 --output results.jsonl`
+- `python3 src/simulator.py --agents 100 --runs 20 --seed 42 --output results/results.jsonl`
+- `python3 src/simulator.py --agents 50 --conformity-threshold 0.7 --whale-ratio 0.2 --output results/results.jsonl`
 
 Flags:
 - `--agents`: number of agents (default: 50)
@@ -23,6 +24,28 @@ Flags:
 - `--conformity-threshold`: minimum conformity to follow whale signal (default: 0.6)
 - `--whale-ratio`: fraction of agents that are whales (default: 0.15)
 - `--output`: optional JSONL output path for run summaries
+
+## Schema Discipline
+- Each run emits a uniform schema with `schema_version: "0.2"`, `run_id` (UUID4), and ISO timestamp.
+- Consistent keys across runs: proposal block, votes (initial/final/weighted), flips, per-agent records, and run parameters.
+- Use `migrate_results.py <old.jsonl> <new.jsonl>` to normalize legacy outputs into the v0.2 schema.
+
+## Project Layout
+```
+.
+├── src/
+│   ├── simulator.py
+│   └── utils/
+│       └── schema.py
+├── results/          # default location for JSONL outputs
+├── tests/
+│   └── test_schema.py
+├── migrate_results.py
+└── README.md
+```
+
+## Tests
+- Minimal schema check: `python -m unittest tests/test_schema.py`
 
 ## Engineering Roadmap
 - Containerization with Docker

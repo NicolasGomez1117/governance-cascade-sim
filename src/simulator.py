@@ -1,8 +1,12 @@
 import argparse
 import json
 import random
+import uuid
 from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
+
+from utils.schema import SCHEMA_VERSION, validate_result_schema
 
 
 @dataclass
@@ -139,9 +143,14 @@ def simulate_once(num_agents: int, conformity_threshold: float, whale_ratio: flo
         )
 
     result = {
+        "schema_version": SCHEMA_VERSION,
+        "run_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "seed": seed,
         "num_agents": num_agents,
         "num_whales": sum(1 for a in agents if a.is_whale),
+        "conformity_threshold": conformity_threshold,
+        "whale_ratio": whale_ratio,
         "whale_signal": whale_signal,
         "proposal": asdict(proposal),
         "initial_votes": {"yes": initial_counts[0], "no": initial_counts[1], "abstain": initial_counts[2]},
@@ -151,6 +160,7 @@ def simulate_once(num_agents: int, conformity_threshold: float, whale_ratio: flo
         "flips": flips,
         "agents": agent_records,
     }
+    validate_result_schema(result)
     return result
 
 
@@ -191,7 +201,7 @@ def print_run(result: Dict[str, object], run_number: int, total_runs: int) -> No
     weighted_final = result["weighted_final"]
     whale_signal = result.get("whale_signal", 0)
 
-    print(f"\n=== Run {run_number}/{total_runs} ===")
+    print(f"\n=== Run {run_number}/{total_runs} ({result.get('run_id', 'unknown')}) ===")
     print(
         "Proposal: "
         f"risk_change={proposal['risk_change']:.2f}, "
