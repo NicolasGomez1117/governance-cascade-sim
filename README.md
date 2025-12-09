@@ -46,6 +46,7 @@ Flags:
 
 ## Tests
 - Minimal schema check: `python -m unittest tests/test_schema.py`
+- Validate outputs: `python src/validate_results.py --file results/results.jsonl`
 
 ## Engineering Roadmap
 - Containerization with Docker
