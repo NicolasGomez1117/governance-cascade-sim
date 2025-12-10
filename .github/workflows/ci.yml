@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run unit tests
+        run: python -m unittest tests/test_schema.py
+
+  validate-results:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Generate candidate results
+        run: python src/simulator.py --agents 50 --runs 3 --seed 42 --output results/ci.jsonl
+      - name: Validate generated JSONL
+        run: python src/validate_results.py --file results/ci.jsonl
+      - name: Upload validated artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validated-results
+          path: results/ci.jsonl

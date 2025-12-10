@@ -47,6 +47,7 @@ Flags:
 ## Tests
 - Minimal schema check: `python -m unittest tests/test_schema.py`
 - Validate outputs: `python src/validate_results.py --file results/results.jsonl`
+- CI: GitHub Actions runs unit tests, generates sample outputs, validates them, and only uploads validated artifacts.
 
 ## Engineering Roadmap
 - Containerization with Docker
