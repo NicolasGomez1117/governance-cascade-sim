@@ -2,7 +2,15 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List
 
-SCHEMA_VERSION = "0.2"
+SCHEMA_VERSION = "0.4"
+ALLOWED_AGENT_TYPES = {
+    "optimizer",
+    "reputation_seeker",
+    "contrarian",
+    "institution",
+    "retail",
+    "whale",
+}
 
 
 def default_votes() -> Dict[str, float]:
@@ -38,6 +46,9 @@ def validate_result_schema(result: Dict[str, Any]) -> None:
         "weighted_initial",
         "weighted_final",
         "flips",
+        "cascade_rounds",
+        "agents_flipped_total",
+        "influence_model",
         "agents",
     }
     present_keys = set(result.keys())
@@ -71,6 +82,16 @@ def validate_result_schema(result: Dict[str, Any]) -> None:
     for field in float_fields:
         if not isinstance(result[field], (int, float)):
             raise ValueError(f"{field} must be float")
+
+    if not isinstance(result["cascade_rounds"], int) or result["cascade_rounds"] < 1:
+        raise ValueError("cascade_rounds must be int >= 1")
+    if not isinstance(result["agents_flipped_total"], int) or result["agents_flipped_total"] < 0:
+        raise ValueError("agents_flipped_total must be int >= 0")
+    if not isinstance(result["influence_model"], str):
+        raise ValueError("influence_model must be a string")
+    allowed_influence = {"erdos_renyi", "small_world", "none"}
+    if result["influence_model"] not in allowed_influence:
+        raise ValueError(f"influence_model must be one of {sorted(allowed_influence)}")
 
     _validate_vote_block(result["initial_votes"], field_name="initial_votes", expect_int=True)
     _validate_vote_block(result["final_votes"], field_name="final_votes", expect_int=True)
@@ -106,6 +127,7 @@ def validate_result_schema(result: Dict[str, Any]) -> None:
             "voting_power",
             "initial_vote",
             "final_vote",
+            "agent_type",
         }
         agent_keys = set(agent.keys())
         missing_agent_fields = expected_agent_fields - agent_keys
@@ -114,6 +136,10 @@ def validate_result_schema(result: Dict[str, Any]) -> None:
         extra_agent_fields = agent_keys - expected_agent_fields
         if extra_agent_fields:
             raise ValueError(f"agents[{idx}] unexpected fields {sorted(extra_agent_fields)}")
+        if not isinstance(agent["agent_type"], str):
+            raise ValueError(f"agents[{idx}].agent_type must be str")
+        if agent["agent_type"] not in ALLOWED_AGENT_TYPES:
+            raise ValueError(f"agents[{idx}].agent_type must be one of {sorted(ALLOWED_AGENT_TYPES)}")
         if not isinstance(agent["is_whale"], bool):
             raise ValueError(f"agents[{idx}].is_whale must be bool")
         numeric_fields = ["risk_tolerance", "greed", "conformity", "voting_power", "initial_vote", "final_vote"]

@@ -1,0 +1,92 @@
+{
+  "schema_version": "0.4",
+  "run_id": "RUN_ID",
+  "timestamp": "TIMESTAMP",
+  "seed": 11,
+  "num_agents": 5,
+  "num_whales": 2,
+  "conformity_threshold": 0.6,
+  "whale_ratio": 0.2,
+  "whale_signal": 1,
+  "influence_model": "erdos_renyi",
+  "proposal": {
+    "risk_change": 0.042855,
+    "yield_change": 0.41575,
+    "complexity": 0.746947
+  },
+  "initial_votes": {
+    "yes": 3,
+    "no": 0,
+    "abstain": 2
+  },
+  "final_votes": {
+    "yes": 4,
+    "no": 0,
+    "abstain": 1
+  },
+  "weighted_initial": {
+    "yes": 5.317806,
+    "no": 0,
+    "abstain": 3.494719
+  },
+  "weighted_final": {
+    "yes": 6.241901,
+    "no": 0,
+    "abstain": 2.570625
+  },
+  "flips": 1,
+  "cascade_rounds": 2,
+  "agents_flipped_total": 1,
+  "agents": [
+    {
+      "agent_type": "contrarian",
+      "is_whale": false,
+      "risk_tolerance": 0.693692,
+      "greed": 0.473864,
+      "conformity": 0.355954,
+      "voting_power": 0.703906,
+      "initial_vote": 1,
+      "final_vote": 1
+    },
+    {
+      "agent_type": "optimizer",
+      "is_whale": false,
+      "risk_tolerance": 0.412381,
+      "greed": 0.545335,
+      "conformity": 0.685787,
+      "voting_power": 0.924095,
+      "initial_vote": 0,
+      "final_vote": 1
+    },
+    {
+      "agent_type": "whale",
+      "is_whale": true,
+      "risk_tolerance": 0.789316,
+      "greed": 0.978855,
+      "conformity": 0.426961,
+      "voting_power": 3.846688,
+      "initial_vote": 1,
+      "final_vote": 1
+    },
+    {
+      "agent_type": "whale",
+      "is_whale": true,
+      "risk_tolerance": 0.209,
+      "greed": 0.717029,
+      "conformity": 0.129776,
+      "voting_power": 2.570625,
+      "initial_vote": 0,
+      "final_vote": 0
+    },
+    {
+      "agent_type": "optimizer",
+      "is_whale": false,
+      "risk_tolerance": 0.524754,
+      "greed": 0.720266,
+      "conformity": 0.705456,
+      "voting_power": 0.767212,
+      "initial_vote": 1,
+      "final_vote": 1
+    }
+  ]
+}

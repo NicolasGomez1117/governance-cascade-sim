@@ -1,5 +1,5 @@
 """
-Migration utility to normalize legacy JSONL outputs to schema version 0.2.
+Migration utility to normalize legacy JSONL outputs to schema version 0.4.
 """
 
 import argparse
@@ -16,12 +16,12 @@ SRC_DIR = SCRIPT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from utils.schema import SCHEMA_VERSION, validate_result_schema  # noqa: E402
+from utils.schema import ALLOWED_AGENT_TYPES, SCHEMA_VERSION, validate_result_schema  # noqa: E402
 
 
 def migrate_record(raw: Dict[str, Any], default_seed: int = 0) -> Optional[Dict[str, Any]]:
     """
-    Transform a legacy record into the v0.2 schema. Returns None if migration fails.
+    Transform a legacy record into the v0.4 schema. Returns None if migration fails.
     """
     def vote_block(source: Dict[str, Any], keys) -> Optional[Dict[str, Any]]:
         for key in keys:
@@ -72,6 +72,9 @@ def migrate_record(raw: Dict[str, Any], default_seed: int = 0) -> Optional[Dict[
         "weighted_initial": weighted_initial,
         "weighted_final": weighted_final,
         "flips": int(raw.get("flips", 0)),
+        "cascade_rounds": max(1, int(raw.get("cascade_rounds", 1))),
+        "agents_flipped_total": max(0, int(raw.get("agents_flipped_total", raw.get("flips", 0)))),
+        "influence_model": raw.get("influence_model", "none"),
         "agents": normalize_agents(agents),
     }
 
@@ -89,9 +92,14 @@ def normalize_agents(agents: Any):
         if not isinstance(agent, dict):
             print("Warning: skipping non-dict agent", file=sys.stderr)
             continue
+        is_whale = bool(agent.get("is_whale", False))
+        agent_type = agent.get("agent_type")
+        if agent_type not in ALLOWED_AGENT_TYPES:
+            agent_type = "whale" if is_whale else "optimizer"
         normalized.append(
             {
-                "is_whale": bool(agent.get("is_whale", False)),
+                "agent_type": agent_type,
+                "is_whale": is_whale,
                 "risk_tolerance": float(agent.get("risk_tolerance", 0.0)),
                 "greed": float(agent.get("greed", 0.0)),
                 "conformity": float(agent.get("conformity", 0.0)),
@@ -132,7 +140,7 @@ def migrate_file(input_path: Path, output_path: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Migrate JSONL results to schema version 0.2")
+    parser = argparse.ArgumentParser(description="Migrate JSONL results to schema version 0.4")
     parser.add_argument("input", type=Path, help="Path to legacy JSONL file")
     parser.add_argument("output", type=Path, help="Path to write migrated JSONL file")
     return parser.parse_args()

@@ -6,7 +6,8 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
-from utils.schema import SCHEMA_VERSION, validate_result_schema
+from influence import InfluenceNetwork
+from utils.schema import ALLOWED_AGENT_TYPES, SCHEMA_VERSION, validate_result_schema
 
 
 @dataclass
@@ -18,6 +19,7 @@ class Proposal:
 
 @dataclass
 class Agent:
+    agent_type: str
     risk_tolerance: float  # 0 (risk averse) to 1 (risk seeking)
     greed: float  # 0 (yield agnostic) to 1 (yield maximizer)
     conformity: float  # 0 (independent) to 1 (follows whales)
@@ -27,22 +29,11 @@ class Agent:
     def decide_vote(self, proposal: Proposal, whale_signal: Optional[int]) -> int:
         """
         Returns +1 for YES, -1 for NO, 0 for ABSTAIN.
-        Decision rule mixes personal utility with an optional whale signal.
+        Decision rule mixes personal utility with archetype-specific adjustments and an optional whale signal.
         """
-        # Personal utility: greed chases yield, risk_tolerance mutes risk aversion.
-        yield_component = proposal.yield_change * self.greed
-        risk_component = proposal.risk_change * (1 - self.risk_tolerance)
-        complexity_penalty = proposal.complexity * (1 - self.risk_tolerance) * 0.4
-        personal_score = yield_component - risk_component - complexity_penalty
-
-        # Mild randomness to avoid perfectly rigid decisions.
-        noise = random.uniform(-0.05, 0.05)
-        personal_score += noise
-
-        # Conformity pulls the vote toward the whale majority signal.
-        if whale_signal is not None and whale_signal != 0:
-            sway = self.conformity * whale_signal * max(abs(personal_score), 0.1)
-            personal_score = 0.7 * personal_score + 0.3 * sway
+        personal_score = self._personal_utility(proposal)
+        personal_score = self._apply_noise(personal_score)
+        personal_score = self._apply_signal(personal_score, whale_signal)
 
         if personal_score > 0.05:
             return 1
@@ -50,20 +41,149 @@ class Agent:
             return -1
         return 0
 
+    def _personal_utility(self, proposal: Proposal) -> float:
+        # Greed chases yield, risk_tolerance mutes risk aversion.
+        yield_component = proposal.yield_change * self.greed
+        risk_component = proposal.risk_change * (1 - self.risk_tolerance)
+        complexity_penalty = proposal.complexity * (1 - self.risk_tolerance) * 0.4
+        base = yield_component - risk_component - complexity_penalty
+
+        # Archetype-specific bias toward/against complexity and risk.
+        if self.agent_type == "institution":
+            base -= proposal.complexity * 0.1
+        elif self.agent_type == "retail":
+            base += proposal.yield_change * 0.05
+        elif self.agent_type == "contrarian":
+            base -= proposal.risk_change * 0.05
+        return base
+
+    def _noise_amplitude(self) -> float:
+        noise_by_type = {
+            "optimizer": 0.05,
+            "reputation_seeker": 0.05,
+            "contrarian": 0.03,
+            "institution": 0.01,
+            "retail": 0.12,
+            "whale": 0.02,
+        }
+        return noise_by_type.get(self.agent_type, 0.05)
+
+    def _apply_noise(self, score: float) -> float:
+        noise = random.uniform(-self._noise_amplitude(), self._noise_amplitude())
+        return score + noise
+
+    def _apply_signal(self, score: float, whale_signal: Optional[int]) -> float:
+        if whale_signal is None or whale_signal == 0:
+            return score
+
+        magnitude = max(abs(score), 0.1)
+        if self.agent_type == "contrarian":
+            sway = -self.conformity * whale_signal * magnitude
+            return 0.6 * score + 0.4 * sway
+        if self.agent_type == "reputation_seeker":
+            sway = 1.2 * self.conformity * whale_signal * magnitude
+            return 0.55 * score + 0.45 * sway
+        if self.agent_type == "institution":
+            sway = 0.4 * self.conformity * whale_signal * magnitude * 0.5
+            return 0.8 * score + 0.2 * sway
+        if self.agent_type == "retail":
+            sway = 0.8 * self.conformity * whale_signal * magnitude
+            return 0.65 * score + 0.35 * sway
+
+        # Optimizer/whale defaults.
+        sway = 0.6 * self.conformity * whale_signal * magnitude
+        return 0.7 * score + 0.3 * sway
+
 
 def generate_agents(n: int, whale_ratio: float = 0.15) -> List[Agent]:
     agents: List[Agent] = []
     for _ in range(n):
         is_whale = random.random() < whale_ratio
-        agent = Agent(
-            risk_tolerance=random.uniform(0.1, 0.9),
-            greed=random.uniform(0.2, 1.0),
-            conformity=random.uniform(0.0, 1.0),
-            voting_power=random.uniform(2.0, 5.0) if is_whale else random.uniform(0.2, 1.0),
-            is_whale=is_whale,
-        )
+        agent_type = "whale" if is_whale else _sample_agent_type()
+        agent = _build_agent(agent_type, is_whale)
         agents.append(agent)
     return agents
+
+
+def _sample_agent_type() -> str:
+    """
+    Deterministic-friendly sampler over non-whale archetypes.
+    Weights favor optimizers and reputation seekers.
+    """
+    choices: List[Tuple[str, float]] = [
+        ("optimizer", 0.30),
+        ("reputation_seeker", 0.20),
+        ("contrarian", 0.15),
+        ("institution", 0.15),
+        ("retail", 0.20),
+    ]
+    roll = random.random()
+    cumulative = 0.0
+    for archetype, weight in choices:
+        cumulative += weight
+        if roll <= cumulative:
+            return archetype
+    return choices[-1][0]
+
+
+def _build_agent(agent_type: str, is_whale: bool) -> Agent:
+    if agent_type not in ALLOWED_AGENT_TYPES:
+        raise ValueError(f"Unsupported agent type: {agent_type}")
+
+    if agent_type == "whale":
+        return Agent(
+            agent_type="whale",
+            risk_tolerance=random.uniform(0.2, 0.8),
+            greed=random.uniform(0.4, 1.0),
+            conformity=random.uniform(0.1, 0.6),
+            voting_power=random.uniform(2.0, 5.0),
+            is_whale=True,
+        )
+    if agent_type == "optimizer":
+        return Agent(
+            agent_type=agent_type,
+            risk_tolerance=random.uniform(0.2, 0.9),
+            greed=random.uniform(0.5, 1.0),
+            conformity=random.uniform(0.2, 0.8),
+            voting_power=random.uniform(0.3, 1.2),
+            is_whale=is_whale,
+        )
+    if agent_type == "reputation_seeker":
+        return Agent(
+            agent_type=agent_type,
+            risk_tolerance=random.uniform(0.3, 0.7),
+            greed=random.uniform(0.2, 0.6),
+            conformity=random.uniform(0.6, 1.0),
+            voting_power=random.uniform(0.2, 1.0),
+            is_whale=is_whale,
+        )
+    if agent_type == "contrarian":
+        return Agent(
+            agent_type=agent_type,
+            risk_tolerance=random.uniform(0.4, 0.9),
+            greed=random.uniform(0.4, 0.8),
+            conformity=random.uniform(0.1, 0.6),
+            voting_power=random.uniform(0.2, 1.0),
+            is_whale=is_whale,
+        )
+    if agent_type == "institution":
+        return Agent(
+            agent_type=agent_type,
+            risk_tolerance=random.uniform(0.1, 0.5),
+            greed=random.uniform(0.3, 0.7),
+            conformity=random.uniform(0.2, 0.6),
+            voting_power=random.uniform(0.8, 1.5),
+            is_whale=is_whale,
+        )
+    # retail
+    return Agent(
+        agent_type=agent_type,
+        risk_tolerance=random.uniform(0.3, 0.8),
+        greed=random.uniform(0.2, 1.0),
+        conformity=random.uniform(0.3, 0.9),
+        voting_power=random.uniform(0.1, 0.9),
+        is_whale=is_whale,
+    )
 
 
 def tally_votes(votes: List[int]) -> Tuple[int, int, int]:
@@ -90,8 +210,62 @@ def whale_majority_signal(agents: List[Agent], votes: List[int]) -> int:
     return 0
 
 
-def simulate_once(num_agents: int, conformity_threshold: float, whale_ratio: float, seed: int) -> Dict[str, object]:
+def multi_round_cascade(
+    agents: List[Agent],
+    proposal: Proposal,
+    initial_votes: List[int],
+    network: InfluenceNetwork,
+    conformity_threshold: float,
+    max_rounds: int = 5,
+) -> Tuple[List[int], int, int]:
+    """
+    Propagate influence over the network until convergence or max rounds.
+    Returns final_votes, cascade_rounds, total_flips.
+    """
+    current_votes = list(initial_votes)
+    total_flips = 0
+    rounds = 0
+
+    for _ in range(max_rounds):
+        rounds += 1
+        flipped_this_round = 0
+        next_votes: List[int] = list(current_votes)
+
+        for idx, agent in enumerate(agents):
+            neighbor_score = network.influence_score(idx, current_votes)
+            if agent.conformity < conformity_threshold or abs(neighbor_score) < conformity_threshold or neighbor_score == 0:
+                continue
+            neighbor_signal = 1 if neighbor_score > 0 else -1
+            new_vote = agent.decide_vote(proposal, neighbor_signal)
+            if new_vote != current_votes[idx]:
+                next_votes[idx] = new_vote
+                flipped_this_round += 1
+
+        current_votes = next_votes
+        total_flips += flipped_this_round
+        if flipped_this_round == 0:
+            break
+
+    return current_votes, rounds, total_flips
+
+
+def simulate_once(
+    num_agents: int,
+    conformity_threshold: float,
+    whale_ratio: float,
+    seed: int,
+    influence_model: str,
+    network_density: float,
+    rewire_prob: float,
+) -> Dict[str, object]:
     random.seed(seed)
+    network = InfluenceNetwork(
+        num_agents=num_agents,
+        model=influence_model,
+        density=network_density,
+        rewire_prob=rewire_prob,
+        seed=seed,
+    )
     proposal = Proposal(
         risk_change=random.uniform(-0.5, 0.7),
         yield_change=random.uniform(-0.2, 0.9),
@@ -99,28 +273,17 @@ def simulate_once(num_agents: int, conformity_threshold: float, whale_ratio: flo
     )
     agents = generate_agents(num_agents, whale_ratio=whale_ratio)
 
-    # Round 1: whales first, others vote without a whale signal.
-    initial_votes: List[int] = [0] * len(agents)
-    for idx, agent in enumerate(agents):
-        if agent.is_whale:
-            initial_votes[idx] = agent.decide_vote(proposal, whale_signal=None)
-    for idx, agent in enumerate(agents):
-        if not agent.is_whale:
-            initial_votes[idx] = agent.decide_vote(proposal, whale_signal=None)
+    # Round 0: initial personal votes (no social signal yet).
+    initial_votes: List[int] = [agent.decide_vote(proposal, whale_signal=None) for agent in agents]
 
-    whale_signal = whale_majority_signal(agents, initial_votes)
-
-    # Round 2: conformist agents may shift toward the whale majority.
-    final_votes: List[int] = []
-    flips = 0
-    for agent, vote in zip(agents, initial_votes):
-        if agent.conformity >= conformity_threshold and whale_signal != 0:
-            new_vote = agent.decide_vote(proposal, whale_signal)
-            if new_vote != vote:
-                flips += 1
-            final_votes.append(new_vote)
-        else:
-            final_votes.append(vote)
+    final_votes, cascade_rounds, total_flips = multi_round_cascade(
+        agents,
+        proposal,
+        initial_votes,
+        network,
+        conformity_threshold=conformity_threshold,
+        max_rounds=5,
+    )
 
     initial_counts = tally_votes(initial_votes)
     final_counts = tally_votes(final_votes)
@@ -132,6 +295,7 @@ def simulate_once(num_agents: int, conformity_threshold: float, whale_ratio: flo
     for agent, init_vote, final_vote in zip(agents, initial_votes, final_votes):
         agent_records.append(
             {
+                "agent_type": agent.agent_type,
                 "is_whale": agent.is_whale,
                 "risk_tolerance": agent.risk_tolerance,
                 "greed": agent.greed,
@@ -151,13 +315,16 @@ def simulate_once(num_agents: int, conformity_threshold: float, whale_ratio: flo
         "num_whales": sum(1 for a in agents if a.is_whale),
         "conformity_threshold": conformity_threshold,
         "whale_ratio": whale_ratio,
-        "whale_signal": whale_signal,
+        "whale_signal": whale_majority_signal(agents, initial_votes),
+        "influence_model": network.model,
         "proposal": asdict(proposal),
         "initial_votes": {"yes": initial_counts[0], "no": initial_counts[1], "abstain": initial_counts[2]},
         "final_votes": {"yes": final_counts[0], "no": final_counts[1], "abstain": final_counts[2]},
         "weighted_initial": {"yes": weighted_initial[0], "no": weighted_initial[1], "abstain": weighted_initial[2]},
         "weighted_final": {"yes": weighted_final[0], "no": weighted_final[1], "abstain": weighted_final[2]},
-        "flips": flips,
+        "flips": total_flips,
+        "cascade_rounds": cascade_rounds,
+        "agents_flipped_total": total_flips,
         "agents": agent_records,
     }
     validate_result_schema(result)
@@ -177,11 +344,22 @@ def run_simulation(
     runs: int = 1,
     seed: int = 42,
     output: Optional[str] = None,
+    influence_model: str = "erdos_renyi",
+    network_density: float = 0.2,
+    rewire_prob: float = 0.1,
 ) -> List[Dict[str, object]]:
     results: List[Dict[str, object]] = []
     for run_idx in range(runs):
         run_seed = seed + run_idx
-        result = simulate_once(num_agents, conformity_threshold, whale_ratio, run_seed)
+        result = simulate_once(
+            num_agents,
+            conformity_threshold,
+            whale_ratio,
+            run_seed,
+            influence_model=influence_model,
+            network_density=network_density,
+            rewire_prob=rewire_prob,
+        )
         results.append(result)
         print_run(result, run_idx + 1, runs)
         if output:
@@ -209,6 +387,7 @@ def print_run(result: Dict[str, object], run_number: int, total_runs: int) -> No
         f"complexity={proposal['complexity']:.2f}"
     )
     print(f"Agents: {result.get('num_agents', len(result.get('agents', [])))} total, {result.get('num_whales', 0)} whales")
+    print(f"Influence model: {result.get('influence_model', 'unknown')} | Cascade rounds: {result.get('cascade_rounds', '?')}")
     print("Round 1 (before cascade):")
     print(f"  YES={initial['yes']}, NO={initial['no']}, ABSTAIN={initial['abstain']}")
     print(
@@ -218,7 +397,7 @@ def print_run(result: Dict[str, object], run_number: int, total_runs: int) -> No
         f"ABSTAIN={weighted_initial['abstain']:.2f}"
     )
     print(f"  Whale majority signal: {whale_signal:+d}")
-    print("Round 2 (after cascade):")
+    print("After cascade:")
     print(f"  YES={final['yes']}, NO={final['no']}, ABSTAIN={final['abstain']}")
     print(
         "  Weighted "
@@ -226,7 +405,7 @@ def print_run(result: Dict[str, object], run_number: int, total_runs: int) -> No
         f"NO={weighted_final['no']:.2f}, "
         f"ABSTAIN={weighted_final['abstain']:.2f}"
     )
-    print(f"Agents that flipped after whale signal: {result['flips']}")
+    print(f"Agents that flipped during cascade: {result['flips']}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -247,6 +426,25 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional path to write JSONL results",
     )
+    parser.add_argument(
+        "--influence-model",
+        type=str,
+        choices=["erdos_renyi", "small_world"],
+        default="erdos_renyi",
+        help="Influence network model (default: erdos_renyi)",
+    )
+    parser.add_argument(
+        "--network-density",
+        type=float,
+        default=0.2,
+        help="Edge probability/density for influence graph (default: 0.2)",
+    )
+    parser.add_argument(
+        "--rewire-prob",
+        type=float,
+        default=0.1,
+        help="Rewire probability for small_world model (default: 0.1)",
+    )
     return parser.parse_args()
 
 
@@ -259,4 +457,7 @@ if __name__ == "__main__":
         runs=args.runs,
         seed=args.seed,
         output=args.output,
+        influence_model=args.influence_model,
+        network_density=args.network_density,
+        rewire_prob=args.rewire_prob,
     )
