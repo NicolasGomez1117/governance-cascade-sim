@@ -40,9 +40,13 @@ def validate_result_schema(result: Dict[str, Any]) -> None:
         "flips",
         "agents",
     }
-    missing = required_keys - set(result.keys())
+    present_keys = set(result.keys())
+    missing = required_keys - present_keys
     if missing:
         raise ValueError(f"Missing required fields: {sorted(missing)}")
+    extra = present_keys - required_keys
+    if extra:
+        raise ValueError(f"Unexpected fields: {sorted(extra)}")
 
     if result["schema_version"] != SCHEMA_VERSION:
         raise ValueError(f"schema_version must be {SCHEMA_VERSION}")
@@ -76,9 +80,15 @@ def validate_result_schema(result: Dict[str, Any]) -> None:
     proposal = result["proposal"]
     if not isinstance(proposal, dict):
         raise ValueError("proposal must be a dict")
-    for key in ["risk_change", "yield_change", "complexity"]:
-        if key not in proposal:
-            raise ValueError(f"proposal missing {key}")
+    proposal_keys = set(proposal.keys())
+    expected_proposal = {"risk_change", "yield_change", "complexity"}
+    missing_proposal = expected_proposal - proposal_keys
+    extra_proposal = proposal_keys - expected_proposal
+    if missing_proposal:
+        raise ValueError(f"proposal missing {sorted(missing_proposal)}")
+    if extra_proposal:
+        raise ValueError(f"proposal has unexpected fields {sorted(extra_proposal)}")
+    for key in expected_proposal:
         if not isinstance(proposal[key], (int, float)):
             raise ValueError(f"proposal.{key} must be numeric")
 
@@ -97,9 +107,13 @@ def validate_result_schema(result: Dict[str, Any]) -> None:
             "initial_vote",
             "final_vote",
         }
-        missing_agent_fields = expected_agent_fields - set(agent.keys())
+        agent_keys = set(agent.keys())
+        missing_agent_fields = expected_agent_fields - agent_keys
         if missing_agent_fields:
             raise ValueError(f"agents[{idx}] missing fields {sorted(missing_agent_fields)}")
+        extra_agent_fields = agent_keys - expected_agent_fields
+        if extra_agent_fields:
+            raise ValueError(f"agents[{idx}] unexpected fields {sorted(extra_agent_fields)}")
         if not isinstance(agent["is_whale"], bool):
             raise ValueError(f"agents[{idx}].is_whale must be bool")
         numeric_fields = ["risk_tolerance", "greed", "conformity", "voting_power", "initial_vote", "final_vote"]
@@ -111,9 +125,15 @@ def validate_result_schema(result: Dict[str, Any]) -> None:
 def _validate_vote_block(block: Dict[str, Any], field_name: str, expect_int: bool) -> None:
     if not isinstance(block, dict):
         raise ValueError(f"{field_name} must be a dict")
-    for key in ["yes", "no", "abstain"]:
-        if key not in block:
-            raise ValueError(f"{field_name} missing {key}")
+    expected_keys = {"yes", "no", "abstain"}
+    block_keys = set(block.keys())
+    missing = expected_keys - block_keys
+    if missing:
+        raise ValueError(f"{field_name} missing {sorted(missing)}")
+    extra = block_keys - expected_keys
+    if extra:
+        raise ValueError(f"{field_name} has unexpected fields {sorted(extra)}")
+    for key in expected_keys:
         if expect_int and not isinstance(block[key], int):
             raise ValueError(f"{field_name}.{key} must be int")
         if not expect_int and not isinstance(block[key], (int, float)):

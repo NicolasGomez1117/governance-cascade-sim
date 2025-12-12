@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -40,6 +41,54 @@ class SchemaValidationTest(unittest.TestCase):
             checked, errors = validate_file(bad_path)
             self.assertEqual(checked, 0)
             self.assertGreaterEqual(len(errors), 2)
+
+    def test_schema_rejects_unexpected_fields(self):
+        result = run_simulation(num_agents=3, runs=1, seed=7, conformity_threshold=0.6, whale_ratio=0.2, output=None)[0]
+        result_with_extra = dict(result)
+        result_with_extra["extra_field"] = "oops"
+        with self.assertRaises(ValueError):
+            validate_result_schema(result_with_extra)
+        agent_extra = dict(result["agents"][0])
+        agent_extra["unexpected"] = True
+        bad_agent_result = dict(result)
+        bad_agent_result["agents"] = [agent_extra] + result["agents"][1:]
+        with self.assertRaises(ValueError):
+            validate_result_schema(bad_agent_result)
+
+    def test_schema_snapshot_matches_fixture(self):
+        fixture_path = Path(__file__).parent / "fixtures" / "snapshot_v0_2.json"
+        result = run_simulation(num_agents=5, runs=1, seed=11, conformity_threshold=0.6, whale_ratio=0.2, output=None)[0]
+        canonical = self._canonicalize_result(result)
+        fixture = self._load_fixture(fixture_path)
+        self.assertEqual(canonical, fixture)
+
+    @staticmethod
+    def _canonicalize_result(result):
+        """Strip non-deterministic fields and round floats for stable regression checks."""
+        clean = dict(result)
+        clean["run_id"] = "RUN_ID"
+        clean["timestamp"] = "TIMESTAMP"
+
+        def round_num(value):
+            return round(value, 6) if isinstance(value, float) else value
+
+        clean["proposal"] = {k: round_num(v) for k, v in clean["proposal"].items()}
+        for block in ["initial_votes", "final_votes"]:
+            clean[block] = dict(clean[block])
+        for block in ["weighted_initial", "weighted_final"]:
+            clean[block] = {k: round_num(v) for k, v in clean[block].items()}
+        agents = []
+        for agent in clean["agents"]:
+            agents.append({k: round_num(v) if k != "is_whale" else v for k, v in agent.items()})
+        clean["agents"] = agents
+        return clean
+
+    @staticmethod
+    def _load_fixture(path: Path):
+        if not path.exists():
+            raise AssertionError(f"Snapshot fixture missing at {path}")
+        content = path.read_text(encoding="utf-8")
+        return json.loads(content)
 
 
 if __name__ == "__main__":

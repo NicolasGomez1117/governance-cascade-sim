@@ -1,0 +1,84 @@
+{
+  "schema_version": "0.2",
+  "run_id": "RUN_ID",
+  "timestamp": "TIMESTAMP",
+  "seed": 11,
+  "num_agents": 5,
+  "num_whales": 1,
+  "conformity_threshold": 0.6,
+  "whale_ratio": 0.2,
+  "whale_signal": -1,
+  "proposal": {
+    "risk_change": 0.042855,
+    "yield_change": 0.41575,
+    "complexity": 0.746947
+  },
+  "initial_votes": {
+    "yes": 1,
+    "no": 1,
+    "abstain": 3
+  },
+  "final_votes": {
+    "yes": 1,
+    "no": 1,
+    "abstain": 3
+  },
+  "weighted_initial": {
+    "yes": 0.609527,
+    "no": 3.391803,
+    "abstain": 1.867048
+  },
+  "weighted_final": {
+    "yes": 0.609527,
+    "no": 3.391803,
+    "abstain": 1.867048
+  },
+  "flips": 0,
+  "agents": [
+    {
+      "is_whale": false,
+      "risk_tolerance": 0.506273,
+      "greed": 0.669908,
+      "conformity": 0.18466,
+      "voting_power": 0.609527,
+      "initial_vote": 1,
+      "final_vote": 1
+    },
+    {
+      "is_whale": false,
+      "risk_tolerance": 0.734381,
+      "greed": 0.275299,
+      "conformity": 0.303401,
+      "voting_power": 0.272536,
+      "initial_vote": 0,
+      "final_vote": 0
+    },
+    {
+      "is_whale": false,
+      "risk_tolerance": 0.654751,
+      "greed": 0.233504,
+      "conformity": 0.982193,
+      "voting_power": 0.971806,
+      "initial_vote": 0,
+      "final_vote": 0
+    },
+    {
+      "is_whale": false,
+      "risk_tolerance": 0.59245,
+      "greed": 0.325995,
+      "conformity": 0.015001,
+      "voting_power": 0.622705,
+      "initial_vote": 0,
+      "final_vote": 0
+    },
+    {
+      "is_whale": true,
+      "risk_tolerance": 0.252167,
+      "greed": 0.393554,
+      "conformity": 0.030083,
+      "voting_power": 3.391803,
+      "initial_vote": -1,
+      "final_vote": -1
+    }
+  ]
+}
